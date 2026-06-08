@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Watch Games</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
+
+  body {
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* WATCH SHELL */
+  .watch {
+    position: relative;
+    width: 320px;
+    height: 320px;
+  }
+
+  .bezel {
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 30% 25%, #4a4a4a, #1c1c1c 60%, #0a0a0a);
+    box-shadow:
+      0 0 0 6px #333,
+      0 0 0 10px #222,
+      0 0 40px rgba(0,0,0,0.8),
+      inset 0 2px 4px rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .screen {
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    background: #0d1a0f;
+    overflow: hidden;
+    position: relative;
+    box-shadow:
+      inset 0 0 30px rgba(0,0,0,0.6),
+      inset 0 2px 8px rgba(0,0,0,0.4),
+      0 0 0 2px #111;
+  }
+
+  /* green LCD glow */
+  .screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 30%, rgba(100,255,120,0.04), transparent 70%);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* VIEWS */
+  .view {
+    display: none;
+    width: 260px;
+    height: 260px;
+    border-radius: 50%;
+    overflow: hidden;
+    position: absolute;
+    top: 0; left: 0;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .view.active { display: flex; }
+
+  /* MENU */
+  #menu {
+    background: #0d1a0f;
+    gap: 0;
+  }
+
+  .menu-title {
+    font-family: 'Press Start 2P', monospace;
+    color: #4dff6e;
+    font-size: 8px;
+    text-align: center;
+    margin-bottom: 18px;
+    text-shadow: 0 0 8px #4dff6e;
+    letter-spacing: 1px;
+  }
+
+  .menu-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .menu-btn {
+    background: none;
+    border: 1px solid #2a5c30;
+    color: #4dff6e;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 8px 16px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px #4dff6e;
+    transition: all 0.15s;
+    width: 140px;
+    text-align: center;
+  }
+  .menu-btn:active, .menu-btn:hover {
+    background: #1a3d1e;
+    border-color: #4dff6e;
+    box-shadow: 0 0 10px rgba(77,255,110,0.3);
+  }
+
+  /* HUD COMMON */
+  .hud {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    color: #4dff6e;
+    text-shadow: 0 0 5px #4dff6e;
+    position: absolute;
+    z-index: 10;
+  }
+
+  .back-btn {
+    position: absolute;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: none;
+    border: none;
+    color: #2a5c30;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    cursor: pointer;
+    z-index: 20;
+    padding: 4px 8px;
+  }
+  .back-btn:active { color: #4dff6e; }
+
+  /* ===================== SNAKE ===================== */
+  #snake-view {
+    background: #0d1a0f;
+    position: relative;
+  }
+
+  #snake-canvas {
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  #snake-score {
+    top: 55px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 6px;
+    pointer-events: none;
+  }
+
+  #snake-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 15;
+    gap: 10px;
+  }
+
+  .overlay-title {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: #4dff6e;
+    text-shadow: 0 0 10px #4dff6e;
+    text-align: center;
+  }
+  .overlay-sub {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    color: #2a8c40;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .overlay-btn {
+    background: #1a3d1e;
+    border: 1px solid #4dff6e;
+    color: #4dff6e;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    padding: 8px 14px;
+    cursor: pointer;
+    text-shadow: 0 0 6px #4dff6e;
+    box-shadow: 0 0 10px rgba(77,255,110,0.2);
+  }
+  .overlay-btn:active { background: #2a5c30; }
+
+  /* Snake D-pad area */
+  #snake-dpad {
+    position: absolute;
+    bottom: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90px;
+    height: 90px;
+    z-index: 20;
+  }
+  .dpad-btn {
+    position: absolute;
+    background: rgba(77,255,110,0.08);
+    border: 1px solid #2a5c30;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #4dff6e;
+    font-size: 10px;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dpad-btn:active { background: rgba(77,255,110,0.25); }
+  #dp-up    { width: 28px; height: 28px; top: 0; left: 31px; border-radius: 4px 4px 0 0; }
+  #dp-down  { width: 28px; height: 28px; bottom: 0; left: 31px; border-radius: 0 0 4px 4px; }
+  #dp-left  { width: 28px; height: 28px; top: 31px; left: 0; border-radius: 4px 0 0 4px; }
+  #dp-right { width: 28px; height: 28px; top: 31px; right: 0; border-radius: 0 4px 4px 0; }
+
+  /* ===================== REACTION ===================== */
+  #reaction-view {
+    background: #0d1a0f;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  #reaction-ring {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 3px solid #2a5c30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.1s, box-shadow 0.1s;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+  }
+  #reaction-ring.green {
+    border-color: #4dff6e;
+    box-shadow: 0 0 30px rgba(77,255,110,0.5), inset 0 0 20px rgba(77,255,110,0.1);
+    background: rgba(77,255,110,0.05);
+  }
+  #reaction-ring.red {
+    border-color: #ff4d4d;
+    box-shadow: 0 0 30px rgba(255,77,77,0.5), inset 0 0 20px rgba(255,77,77,0.1);
+    background: rgba(255,77,77,0.05);
+  }
+  #reaction-inner {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #4dff6e;
+    text-align: center;
+    line-height: 1.8;
+    text-shadow: 0 0 6px currentColor;
+    pointer-events: none;
+  }
+  #reaction-stats {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    color: #2a8c40;
+    text-align: center;
+    line-height: 2;
+  }
+  #reaction-start {
+    margin-top: 4px;
+  }
+
+  /* ===================== NUMBERS ===================== */
+  #numbers-view {
+    background: #0d1a0f;
+    flex-direction: column;
+    gap: 8px;
+    padding: 30px 20px;
+  }
+
+  #numbers-prompt {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    color: #2a8c40;
+    text-align: center;
+  }
+  #numbers-question {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 16px;
+    color: #4dff6e;
+    text-shadow: 0 0 10px #4dff6e;
+    text-align: center;
+    min-height: 30px;
+  }
+  #numbers-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 64px);
+    gap: 6px;
+    justify-content: center;
+  }
+  .num-opt {
+    background: rgba(77,255,110,0.06);
+    border: 1px solid #2a5c30;
+    color: #4dff6e;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    padding: 10px 0;
+    text-align: center;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.1s;
+    text-shadow: 0 0 6px #4dff6e;
+  }
+  .num-opt:active { background: rgba(77,255,110,0.2); }
+  .num-opt.correct { border-color: #4dff6e; background: rgba(77,255,110,0.2); }
+  .num-opt.wrong { border-color: #ff4d4d; color: #ff4d4d; text-shadow: 0 0 6px #ff4d4d; }
+  #numbers-score-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+  }
+  #numbers-score-row span {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    color: #2a8c40;
+  }
+  #numbers-score-row .val {
+    color: #4dff6e;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="watch">
+  <div class="bezel">
+    <div class="screen">
+
+      <!-- MENU -->
+      <div class="view active" id="menu">
+        <div class="menu-title">WATCH<br>GAMES</div>
+        <div class="menu-items">
+          <button class="menu-btn" onclick="startSnake()">🐍 SNAKE</button>
+          <button class="menu-btn" onclick="startReaction()">⚡ REFLEX</button>
+          <button class="menu-btn" onclick="startNumbers()">🔢 MATHS</button>
+        </div>
+      </div>
+
+      <!-- SNAKE -->
+      <div class="view" id="snake-view">
+        <canvas id="snake-canvas" width="260" height="260"></canvas>
+        <div class="hud" id="snake-score">0</div>
+        <div id="snake-overlay">
+          <div class="overlay-title">SNAKE</div>
+          <div class="overlay-sub">swipe or tap<br>arrows to move</div>
+          <button class="overlay-btn" id="snake-start-btn" onclick="snakeStart()">START</button>
+        </div>
+        <div id="snake-dpad" style="display:none">
+          <div class="dpad-btn" id="dp-up"    ontouchstart="snakeDir(0,-1)" onclick="snakeDir(0,-1)">▲</div>
+          <div class="dpad-btn" id="dp-down"  ontouchstart="snakeDir(0,1)"  onclick="snakeDir(0,1)">▼</div>
+          <div class="dpad-btn" id="dp-left"  ontouchstart="snakeDir(-1,0)" onclick="snakeDir(-1,0)">◀</div>
+          <div class="dpad-btn" id="dp-right" ontouchstart="snakeDir(1,0)"  onclick="snakeDir(1,0)">▶</div>
+        </div>
+        <button class="back-btn" onclick="goMenu()">◀ MENU</button>
+      </div>
+
+      <!-- REACTION / REFLEX -->
+      <div class="view" id="reaction-view">
+        <div id="reaction-ring" onclick="reactionTap()">
+          <div id="reaction-inner">TAP<br>READY</div>
+        </div>
+        <div id="reaction-stats"></div>
+        <button class="overlay-btn" id="reaction-start" onclick="reactionStart()">START</button>
+        <button class="back-btn" onclick="goMenu()">◀ MENU</button>
+      </div>
+
+      <!-- MATHS -->
+      <div class="view" id="numbers-view">
+        <div id="numbers-prompt">SOLVE IT</div>
+        <div id="numbers-question">?</div>
+        <div id="numbers-grid">
+          <button class="num-opt" id="nopt0" onclick="numAnswer(0)"></button>
+          <button class="num-opt" id="nopt1" onclick="numAnswer(1)"></button>
+          <button class="num-opt" id="nopt2" onclick="numAnswer(2)"></button>
+          <button class="num-opt" id="nopt3" onclick="numAnswer(3)"></button>
+        </div>
+        <div id="numbers-score-row">
+          <span>SCORE <span class="val" id="nscore">0</span></span>
+          <span>BEST <span class="val" id="nbest">0</span></span>
+        </div>
+        <button class="back-btn" onclick="goMenu()">◀ MENU</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── UTILS ──────────────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goMenu() {
+  snakeStop();
+  reactionStop();
+  show('menu');
+}
+
+// ══════════════════════════════════════════════════
+//  SNAKE
+// ══════════════════════════════════════════════════
+let snakeTick, snakeBody, snakeDirV, snakeNextDir, snakeFood, snakeScoreV, snakeAlive;
+const SC = document.getElementById('snake-canvas');
+const CTX = SC.getContext('2d');
+const GRID = 13; // cells
+const CELL = Math.floor(260 / GRID);
+const RADIUS = 130;
+
+function inCircle(cx, cy) {
+  const px = (cx + 0.5) * CELL - RADIUS;
+  const py = (cy + 0.5) * CELL - RADIUS;
+  return px * px + py * py < (RADIUS - CELL * 0.5) * (RADIUS - CELL * 0.5);
+}
+
+function startSnake() {
+  show('snake-view');
+  snakeDraw();
+  document.getElementById('snake-overlay').style.display = 'flex';
+  document.getElementById('snake-dpad').style.display = 'none';
+}
+
+function snakeStart() {
+  snakeBody = [{x:6,y:6},{x:5,y:6},{x:4,y:6}];
+  snakeDirV = {x:1,y:0};
+  snakeNextDir = {x:1,y:0};
+  snakeScoreV = 0;
+  snakeAlive = true;
+  document.getElementById('snake-score').textContent = '0';
+  document.getElementById('snake-overlay').style.display = 'none';
+  document.getElementById('snake-dpad').style.display = 'block';
+  placeFood();
+  clearInterval(snakeTick);
+  snakeTick = setInterval(snakeStep, 200);
+}
+
+function snakeStop() { clearInterval(snakeTick); }
+
+function placeFood() {
+  let cells = [];
+  for(let x=0;x<GRID;x++) for(let y=0;y<GRID;y++) {
+    if(inCircle(x,y) && !snakeBody.find(s=>s.x===x&&s.y===y)) cells.push({x,y});
+  }
+  if(cells.length) snakeFood = cells[Math.floor(Math.random()*cells.length)];
+}
+
+function snakeDir(dx,dy) {
+  if(snakeDirV.x===0 && dx!==0) snakeNextDir={x:dx,y:0};
+  else if(snakeDirV.y===0 && dy!==0) snakeNextDir={x:0,y:dy};
+}
+
+function snakeStep() {
+  snakeDirV = snakeNextDir;
+  const head = {x: snakeBody[0].x+snakeDirV.x, y: snakeBody[0].y+snakeDirV.y};
+  if(!inCircle(head.x,head.y) || snakeBody.find(s=>s.x===head.x&&s.y===head.y)) {
+    snakeAlive = false;
+    clearInterval(snakeTick);
+    document.getElementById('snake-overlay').innerHTML =
+      `<div class="overlay-title">DEAD</div><div class="overlay-sub">score: ${snakeScoreV}</div><button class="overlay-btn" onclick="snakeStart()">RETRY</button>`;
+    document.getElementById('snake-overlay').style.display = 'flex';
+    document.getElementById('snake-dpad').style.display = 'none';
+    return;
+  }
+  snakeBody.unshift(head);
+  if(head.x===snakeFood.x && head.y===snakeFood.y) {
+    snakeScoreV++;
+    document.getElementById('snake-score').textContent = snakeScoreV;
+    placeFood();
+  } else {
+    snakeBody.pop();
+  }
+  snakeDraw();
+}
+
+function snakeDraw() {
+  CTX.clearRect(0,0,260,260);
+  // grid dots
+  CTX.fillStyle = 'rgba(77,255,110,0.04)';
+  for(let x=0;x<GRID;x++) for(let y=0;y<GRID;y++) {
+    if(inCircle(x,y)) CTX.fillRect(x*CELL+CELL/2-1,y*CELL+CELL/2-1,2,2);
+  }
+  // food
+  if(snakeFood) {
+    CTX.fillStyle = '#ff4d4d';
+    CTX.shadowColor = '#ff4d4d';
+    CTX.shadowBlur = 8;
+    CTX.fillRect(snakeFood.x*CELL+2, snakeFood.y*CELL+2, CELL-4, CELL-4);
+    CTX.shadowBlur = 0;
+  }
+  // snake
+  if(!snakeBody) return;
+  snakeBody.forEach((s,i) => {
+    const alpha = i===0 ? 1 : 0.85 - i*(0.4/snakeBody.length);
+    CTX.fillStyle = `rgba(77,255,110,${Math.max(0.3,alpha)})`;
+    CTX.shadowColor = '#4dff6e';
+    CTX.shadowBlur = i===0 ? 10 : 4;
+    CTX.fillRect(s.x*CELL+1,s.y*CELL+1,CELL-2,CELL-2);
+  });
+  CTX.shadowBlur = 0;
+}
+
+// swipe support for snake
+let touchSX=0,touchSY=0;
+document.getElementById('snake-view').addEventListener('touchstart',e=>{
+  touchSX=e.touches[0].clientX; touchSY=e.touches[0].clientY;
+},{passive:true});
+document.getElementById('snake-view').addEventListener('touchend',e=>{
+  if(!snakeAlive) return;
+  const dx=e.changedTouches[0].clientX-touchSX;
+  const dy=e.changedTouches[0].clientY-touchSY;
+  if(Math.abs(dx)>Math.abs(dy)) { if(Math.abs(dx)>10) snakeDir(dx>0?1:-1,0); }
+  else { if(Math.abs(dy)>10) snakeDir(0,dy>0?1:-1); }
+},{passive:true});
+
+// ══════════════════════════════════════════════════
+//  REACTION / REFLEX
+// ══════════════════════════════════════════════════
+let reactionState='idle', reactionTimeout, reactionStart2, reactionTimes=[], reactionWaiting=false;
+
+function startReaction() { show('reaction-view'); reactionReset(); }
+function reactionStop() { clearTimeout(reactionTimeout); }
+
+function reactionReset() {
+  reactionState='idle';
+  reactionWaiting=false;
+  document.getElementById('reaction-ring').className='';
+  document.getElementById('reaction-inner').textContent='TAP\nREADY';
+  document.getElementById('reaction-inner').style.color='#4dff6e';
+  document.getElementById('reaction-start').style.display='inline-block';
+  document.getElementById('reaction-stats').textContent='';
+  reactionTimes=[];
+}
+
+function reactionStart() {
+  document.getElementById('reaction-start').style.display='none';
+  reactionState='waiting';
+  document.getElementById('reaction-ring').className='';
+  document.getElementById('reaction-inner').textContent='WAIT...';
+  reactionSchedule();
+}
+
+function reactionSchedule() {
+  const delay = 1000 + Math.random()*3000;
+  reactionTimeout = setTimeout(()=>{
+    reactionState='go';
+    document.getElementById('reaction-ring').className='green';
+    document.getElementById('reaction-inner').textContent='TAP!';
+    reactionStart2 = Date.now();
+  }, delay);
+}
+
+function reactionTap() {
+  if(reactionState==='go') {
+    const ms = Date.now()-reactionStart2;
+    reactionTimes.push(ms);
+    document.getElementById('reaction-ring').className='';
+    document.getElementById('reaction-inner').textContent=ms+'ms';
+    const avg = Math.round(reactionTimes.reduce((a,b)=>a+b,0)/reactionTimes.length);
+    document.getElementById('reaction-stats').innerHTML =
+      `last: ${ms}ms<br>avg: ${avg}ms<br>rounds: ${reactionTimes.length}`;
+    reactionState='waiting';
+    if(reactionTimes.length>=5) {
+      // show best
+      const best = Math.min(...reactionTimes);
+      document.getElementById('reaction-stats').innerHTML += `<br>best: ${best}ms`;
+      document.getElementById('reaction-start').textContent='AGAIN';
+      document.getElementById('reaction-start').style.display='inline-block';
+      reactionState='idle';
+      return;
+    }
+    setTimeout(()=>{ document.getElementById('reaction-inner').textContent='WAIT...'; reactionSchedule(); }, 800);
+  } else if(reactionState==='waiting') {
+    // too early
+    clearTimeout(reactionTimeout);
+    document.getElementById('reaction-ring').className='red';
+    document.getElementById('reaction-inner').textContent='EARLY!';
+    document.getElementById('reaction-inner').style.color='#ff4d4d';
+    reactionState='waiting';
+    setTimeout(()=>{
+      document.getElementById('reaction-ring').className='';
+      document.getElementById('reaction-inner').textContent='WAIT...';
+      document.getElementById('reaction-inner').style.color='#4dff6e';
+      reactionSchedule();
+    }, 1000);
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  MATHS QUIZ
+// ══════════════════════════════════════════════════
+let nScore=0, nBest=0, nCorrect=-1, nLocked=false;
+
+function startNumbers() { show('numbers-view'); nScore=0; numNext(); }
+
+function numNext() {
+  nLocked=false;
+  // generate question
+  const ops=['+','-','×'];
+  const op=ops[Math.floor(Math.random()*ops.length)];
+  let a,b,ans;
+  if(op==='+'){a=Math.floor(Math.random()*20)+1;b=Math.floor(Math.random()*20)+1;ans=a+b;}
+  else if(op==='-'){a=Math.floor(Math.random()*20)+5;b=Math.floor(Math.random()*a)+1;ans=a-b;}
+  else{a=Math.floor(Math.random()*10)+2;b=Math.floor(Math.random()*10)+2;ans=a*b;}
+  document.getElementById('numbers-question').textContent=`${a}${op}${b}`;
+
+  // build options
+  let opts=[ans];
+  while(opts.length<4){
+    let wrong=ans+Math.floor(Math.random()*11)-5;
+    if(wrong!==ans&&wrong>0&&!opts.includes(wrong)) opts.push(wrong);
+  }
+  opts.sort(()=>Math.random()-0.5);
+  nCorrect=opts.indexOf(ans);
+  for(let i=0;i<4;i++){
+    const btn=document.getElementById('nopt'+i);
+    btn.textContent=opts[i];
+    btn.className='num-opt';
+    btn.disabled=false;
+  }
+  document.getElementById('numbers-prompt').textContent='SOLVE IT';
+}
+
+function numAnswer(idx) {
+  if(nLocked) return;
+  nLocked=true;
+  const btn=document.getElementById('nopt'+idx);
+  if(idx===nCorrect){
+    btn.classList.add('correct');
+    nScore++;
+    if(nScore>nBest) nBest=nScore;
+    document.getElementById('numbers-prompt').textContent='CORRECT!';
+  } else {
+    btn.classList.add('wrong');
+    document.getElementById('nopt'+nCorrect).classList.add('correct');
+    nScore=0;
+    document.getElementById('numbers-prompt').textContent='WRONG!';
+  }
+  document.getElementById('nscore').textContent=nScore;
+  document.getElementById('nbest').textContent=nBest;
+  setTimeout(numNext, 900);
+}
+
+// ── INIT ──────────────────────────────────────────
+snakeDraw();
+</script>
+</body>
+</html>
