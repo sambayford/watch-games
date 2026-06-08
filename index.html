@@ -29,12 +29,6 @@
     width: 320px;
     height: 320px;
     border-radius: 50%;
-    background: radial-gradient(ellipse at 30% 25%, #4a4a4a, #1c1c1c 60%, #0a0a0a);
-    box-shadow:
-      0 0 0 6px #333,
-      0 0 0 10px #222,
-      0 0 40px rgba(0,0,0,0.8),
-      inset 0 2px 4px rgba(255,255,255,0.08);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -42,16 +36,12 @@
   }
 
   .screen {
-    width: 260px;
-    height: 260px;
+    width: 320px;
+    height: 320px;
     border-radius: 50%;
     background: #0d1a0f;
     overflow: hidden;
     position: relative;
-    box-shadow:
-      inset 0 0 30px rgba(0,0,0,0.6),
-      inset 0 2px 8px rgba(0,0,0,0.4),
-      0 0 0 2px #111;
   }
 
   /* green LCD glow */
@@ -68,8 +58,8 @@
   /* VIEWS */
   .view {
     display: none;
-    width: 260px;
-    height: 260px;
+    width: 320px;
+    height: 320px;
     border-radius: 50%;
     overflow: hidden;
     position: absolute;
@@ -135,19 +125,23 @@
 
   .back-btn {
     position: absolute;
-    bottom: 52px;
+    bottom: 38px;
     left: 50%;
     transform: translateX(-50%);
     background: none;
     border: none;
-    color: #2a5c30;
+    color: #1a3d1e;
     font-family: 'Press Start 2P', monospace;
-    font-size: 6px;
+    font-size: 5px;
     cursor: pointer;
     z-index: 20;
-    padding: 4px 8px;
+    padding: 2px 6px;
+    letter-spacing: 0;
+    opacity: 0.5;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  .back-btn:active { color: #4dff6e; }
+  .back-btn:active { color: #4dff6e; opacity: 1; }
 
   /* ===================== SNAKE ===================== */
   #snake-view {
@@ -206,32 +200,31 @@
   }
   .overlay-btn:active { background: #2a5c30; }
 
-  /* Snake D-pad area */
+  /* Snake edge buttons */
   #snake-dpad {
     position: absolute;
-    bottom: 44px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90px;
-    height: 90px;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
     z-index: 20;
   }
   .dpad-btn {
     position: absolute;
-    background: rgba(77,255,110,0.08);
-    border: 1px solid #2a5c30;
+    background: rgba(77,255,110,0.07);
+    border: none;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    color: #4dff6e;
-    font-size: 10px;
+    color: rgba(77,255,110,0.45);
+    font-size: 14px;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+    pointer-events: all;
   }
-  .dpad-btn:active { background: rgba(77,255,110,0.25); }
-  #dp-up    { width: 28px; height: 28px; top: 0; left: 31px; border-radius: 4px 4px 0 0; }
-  #dp-down  { width: 28px; height: 28px; bottom: 0; left: 31px; border-radius: 0 0 4px 4px; }
-  #dp-left  { width: 28px; height: 28px; top: 31px; left: 0; border-radius: 4px 0 0 4px; }
-  #dp-right { width: 28px; height: 28px; top: 31px; right: 0; border-radius: 0 4px 4px 0; }
+  .dpad-btn:active { background: rgba(77,255,110,0.22); color: #4dff6e; }
+  #dp-up    { top: 0; left: 50%; transform: translateX(-50%); width: 80px; height: 52px; border-radius: 0 0 40px 40px; }
+  #dp-down  { bottom: 0; left: 50%; transform: translateX(-50%); width: 80px; height: 52px; border-radius: 40px 40px 0 0; }
+  #dp-left  { left: 0; top: 50%; transform: translateY(-50%); width: 52px; height: 80px; border-radius: 0 40px 40px 0; }
+  #dp-right { right: 0; top: 50%; transform: translateY(-50%); width: 52px; height: 80px; border-radius: 40px 0 0 40px; }
 
   /* ===================== REACTION ===================== */
   #reaction-view {
@@ -362,7 +355,7 @@
 
       <!-- SNAKE -->
       <div class="view" id="snake-view">
-        <canvas id="snake-canvas" width="260" height="260"></canvas>
+        <canvas id="snake-canvas" width="320" height="320"></canvas>
         <div class="hud" id="snake-score">0</div>
         <div id="snake-overlay">
           <div class="overlay-title">SNAKE</div>
@@ -375,7 +368,7 @@
           <div class="dpad-btn" id="dp-left"  ontouchstart="snakeDir(-1,0)" onclick="snakeDir(-1,0)">◀</div>
           <div class="dpad-btn" id="dp-right" ontouchstart="snakeDir(1,0)"  onclick="snakeDir(1,0)">▶</div>
         </div>
-        <button class="back-btn" onclick="goMenu()">◀ MENU</button>
+        <button class="back-btn" id="back-snake">hold: MENU</button>
       </div>
 
       <!-- REACTION / REFLEX -->
@@ -385,7 +378,7 @@
         </div>
         <div id="reaction-stats"></div>
         <button class="overlay-btn" id="reaction-start" onclick="reactionStart()">START</button>
-        <button class="back-btn" onclick="goMenu()">◀ MENU</button>
+        <button class="back-btn" id="back-reaction">hold: MENU</button>
       </div>
 
       <!-- MATHS -->
@@ -402,7 +395,7 @@
           <span>SCORE <span class="val" id="nscore">0</span></span>
           <span>BEST <span class="val" id="nbest">0</span></span>
         </div>
-        <button class="back-btn" onclick="goMenu()">◀ MENU</button>
+        <button class="back-btn" id="back-numbers">hold: MENU</button>
       </div>
 
     </div>
@@ -428,9 +421,9 @@ function goMenu() {
 let snakeTick, snakeBody, snakeDirV, snakeNextDir, snakeFood, snakeScoreV, snakeAlive;
 const SC = document.getElementById('snake-canvas');
 const CTX = SC.getContext('2d');
-const GRID = 13; // cells
-const CELL = Math.floor(260 / GRID);
-const RADIUS = 130;
+const GRID = 20; // cells
+const CELL = Math.floor(320 / GRID);
+const RADIUS = 160;
 
 function inCircle(cx, cy) {
   const px = (cx + 0.5) * CELL - RADIUS;
@@ -456,7 +449,7 @@ function snakeStart() {
   document.getElementById('snake-dpad').style.display = 'block';
   placeFood();
   clearInterval(snakeTick);
-  snakeTick = setInterval(snakeStep, 200);
+  snakeTick = setInterval(snakeStep, 300);
 }
 
 function snakeStop() { clearInterval(snakeTick); }
@@ -498,7 +491,7 @@ function snakeStep() {
 }
 
 function snakeDraw() {
-  CTX.clearRect(0,0,260,260);
+  CTX.clearRect(0,0,320,320);
   // grid dots
   CTX.fillStyle = 'rgba(77,255,110,0.04)';
   for(let x=0;x<GRID;x++) for(let y=0;y<GRID;y++) {
@@ -667,6 +660,38 @@ function numAnswer(idx) {
 
 // ── INIT ──────────────────────────────────────────
 snakeDraw();
+
+// Long-press back buttons (600ms hold to go to menu)
+['back-snake','back-reaction','back-numbers'].forEach(id => {
+  const btn = document.getElementById(id);
+  let raf;
+  const DURATION = 600;
+
+  function startHold(e) {
+    e.preventDefault();
+    const start = Date.now();
+    function tick() {
+      const progress = Math.min(1, (Date.now() - start) / DURATION);
+      btn.style.opacity = 0.5 + progress * 0.5;
+      if (progress >= 1) { goMenu(); btn.style.opacity = ''; }
+      else { raf = requestAnimationFrame(tick); }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  function endHold() {
+    cancelAnimationFrame(raf);
+    btn.style.opacity = '';
+  }
+
+  btn.addEventListener('mousedown', startHold);
+  btn.addEventListener('touchstart', startHold, {passive: false});
+  btn.addEventListener('mouseup', endHold);
+  btn.addEventListener('mouseleave', endHold);
+  btn.addEventListener('touchend', endHold);
+  btn.addEventListener('touchcancel', endHold);
+  btn.addEventListener('click', e => e.preventDefault());
+});
 </script>
 </body>
 </html>
