@@ -79,6 +79,15 @@
   #menu {
     background: #0d1a0f;
     gap: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    padding: 54px 0 40px;
+  }
+
+  #menu::-webkit-scrollbar {
+    display: none;
   }
 
   .menu-title {
