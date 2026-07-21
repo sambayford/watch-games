@@ -366,6 +366,42 @@
     cursor: pointer;
   }
 
+  /* ===================== BATTLE BOATS ===================== */
+  #bb-view {
+    background: #0d1a0f;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 16px 48px;
+    position: relative;
+  }
+  #bb-score-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+  }
+  #bb-score-row span {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    color: #2a8c40;
+  }
+  #bb-score-row .val {
+    color: #4dff6e;
+  }
+  #bb-canvas {
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #bb-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 15;
+    gap: 10px;
+  }
+
 </style>
 </head>
 <body>
@@ -382,6 +418,7 @@
           <button class="menu-btn" onclick="startReaction()">⚡ REFLEX</button>
           <button class="menu-btn" onclick="startNumbers()">🔢 MATHS</button>
           <button class="menu-btn" onclick="startFruit()">🍓 FRUIT</button>
+          <button class="menu-btn" onclick="startBattleBoats()">🚢 BOATS</button>
         </div>
       </div>
 
@@ -440,6 +477,21 @@
         <button class="back-btn" id="back-fruit">hold: MENU</button>
       </div>
 
+      <!-- BATTLE BOATS -->
+      <div class="view" id="bb-view">
+        <div id="bb-score-row">
+          <span>SHOTS <span class="val" id="bbshots">0</span></span>
+          <span>SUNK <span class="val" id="bbsunk">0/3</span></span>
+        </div>
+        <canvas id="bb-canvas" width="210" height="210"></canvas>
+        <div id="bb-overlay">
+          <div class="overlay-title">BATTLE<br>BOATS</div>
+          <div class="overlay-sub">tap grid to fire<br>sink all 3 ships</div>
+          <button class="overlay-btn" onclick="bbStart()">START</button>
+        </div>
+        <button class="back-btn" id="back-bb">hold: MENU</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -455,6 +507,7 @@ function goMenu() {
   snakeStop();
   reactionStop();
   fruitStop();
+  bbStop();
   show('menu');
 }
 
@@ -912,11 +965,151 @@ FC.addEventListener('click', e => {
   fruitTapXY(e.clientX, e.clientY);
 });
 
+// ══════════════════════════════════════════════════
+//  BATTLE BOATS (simplified single-grid target-practice
+//  version of battle-boats — no placement phase, no AI
+//  opponent shooting back, just sink the hidden fleet)
+// ══════════════════════════════════════════════════
+const BGRID = 6;
+const BCELL = 35;
+const BSHIPS = [3, 2, 2];
+const BC = document.getElementById('bb-canvas');
+const BCTX = BC.getContext('2d');
+let bbShipBoard = [], bbShotBoard = [], bbShipRemaining = [];
+let bbShotsTaken = 0, bbSunkCount = 0, bbGameOver = true;
+
+function startBattleBoats() {
+  show('bb-view');
+  document.getElementById('bb-overlay').innerHTML =
+    '<div class="overlay-title">BATTLE<br>BOATS</div><div class="overlay-sub">tap grid to fire<br>sink all 3 ships</div><button class="overlay-btn" onclick="bbStart()">START</button>';
+  document.getElementById('bb-overlay').style.display = 'flex';
+  BCTX.clearRect(0, 0, BGRID * BCELL, BGRID * BCELL);
+}
+
+function bbStop() {
+  bbGameOver = true;
+}
+
+function bbActive() {
+  return document.getElementById('bb-view').classList.contains('active');
+}
+
+function bbGenerateBoard() {
+  bbShipBoard = Array.from({ length: BGRID }, () => Array(BGRID).fill(-1));
+  bbShotBoard = Array.from({ length: BGRID }, () => Array(BGRID).fill(0));
+  bbShipRemaining = BSHIPS.slice();
+  BSHIPS.forEach((len, idx) => bbPlaceShip(idx, len));
+}
+
+function bbPlaceShip(idx, len) {
+  let attempts = 0;
+  while (attempts < 300) {
+    attempts++;
+    const horizontal = Math.random() < 0.5;
+    const x = Math.floor(Math.random() * (horizontal ? BGRID - len + 1 : BGRID));
+    const y = Math.floor(Math.random() * (horizontal ? BGRID : BGRID - len + 1));
+    let ok = true;
+    for (let i = 0; i < len; i++) {
+      const cx = horizontal ? x + i : x;
+      const cy = horizontal ? y : y + i;
+      if (bbShipBoard[cy][cx] !== -1) { ok = false; break; }
+    }
+    if (ok) {
+      for (let i = 0; i < len; i++) {
+        const cx = horizontal ? x + i : x;
+        const cy = horizontal ? y : y + i;
+        bbShipBoard[cy][cx] = idx;
+      }
+      return;
+    }
+  }
+}
+
+function bbStart() {
+  bbGenerateBoard();
+  bbShotsTaken = 0;
+  bbSunkCount = 0;
+  bbGameOver = false;
+  document.getElementById('bbshots').textContent = 0;
+  document.getElementById('bbsunk').textContent = '0/' + BSHIPS.length;
+  document.getElementById('bb-overlay').style.display = 'none';
+  bbDraw();
+}
+
+function bbDraw() {
+  BCTX.clearRect(0, 0, BGRID * BCELL, BGRID * BCELL);
+  for (let y = 0; y < BGRID; y++) {
+    for (let x = 0; x < BGRID; x++) {
+      const px = x * BCELL, py = y * BCELL;
+      BCTX.strokeStyle = '#1a3d1e';
+      BCTX.lineWidth = 1;
+      BCTX.strokeRect(px + 0.5, py + 0.5, BCELL - 1, BCELL - 1);
+      const shot = bbShotBoard[y][x];
+      if (shot === 1) {
+        const shipIdx = bbShipBoard[y][x];
+        const sunk = bbShipRemaining[shipIdx] === 0;
+        BCTX.fillStyle = sunk ? 'rgba(255,77,77,0.35)' : '#ff4d4d';
+        BCTX.shadowColor = '#ff4d4d';
+        BCTX.shadowBlur = sunk ? 0 : 8;
+        BCTX.fillRect(px + 5, py + 5, BCELL - 10, BCELL - 10);
+        BCTX.shadowBlur = 0;
+      } else if (shot === 2) {
+        BCTX.fillStyle = 'rgba(77,255,110,0.3)';
+        BCTX.beginPath();
+        BCTX.arc(px + BCELL / 2, py + BCELL / 2, BCELL * 0.14, 0, Math.PI * 2);
+        BCTX.fill();
+      }
+    }
+  }
+}
+
+function bbTapXY(clientX, clientY) {
+  if (!bbActive() || bbGameOver) return;
+  const rect = BC.getBoundingClientRect();
+  const x = Math.floor((clientX - rect.left) / (rect.width / BGRID));
+  const y = Math.floor((clientY - rect.top) / (rect.height / BGRID));
+  if (x < 0 || x >= BGRID || y < 0 || y >= BGRID) return;
+  bbFire(x, y);
+}
+
+function bbFire(x, y) {
+  if (bbShotBoard[y][x] !== 0) return;
+  const shipIdx = bbShipBoard[y][x];
+  if (shipIdx === -1) {
+    bbShotBoard[y][x] = 2;
+  } else {
+    bbShotBoard[y][x] = 1;
+    bbShipRemaining[shipIdx]--;
+    if (bbShipRemaining[shipIdx] === 0) {
+      bbSunkCount++;
+      document.getElementById('bbsunk').textContent = bbSunkCount + '/' + BSHIPS.length;
+    }
+  }
+  bbShotsTaken++;
+  document.getElementById('bbshots').textContent = bbShotsTaken;
+  bbDraw();
+  if (bbSunkCount === BSHIPS.length) {
+    bbGameOver = true;
+    document.getElementById('bb-overlay').innerHTML =
+      `<div class="overlay-title">ALL SUNK!</div><div class="overlay-sub">shots: ${bbShotsTaken}</div><button class="overlay-btn" onclick="bbStart()">PLAY AGAIN</button>`;
+    document.getElementById('bb-overlay').style.display = 'flex';
+  }
+}
+
+BC.addEventListener('touchend', e => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  bbTapXY(t.clientX, t.clientY);
+}, { passive: false });
+BC.addEventListener('click', e => {
+  bbTapXY(e.clientX, e.clientY);
+});
+
 // ── INIT ──────────────────────────────────────────
 snakeDraw();
 
 // Long-press back buttons (600ms hold to go to menu)
-['back-snake','back-reaction','back-numbers','back-fruit'].forEach(id => {
+['back-snake','back-reaction','back-numbers','back-fruit','back-bb'].forEach(id => {
   const btn = document.getElementById(id);
   let raf;
   const DURATION = 600;
