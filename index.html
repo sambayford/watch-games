@@ -335,6 +335,31 @@
     color: #4dff6e;
   }
 
+  /* ===================== FRUIT CASCADE ===================== */
+  #fruit-view {
+    background: #0d1a0f;
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px 20px;
+  }
+  #fruit-score-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+  }
+  #fruit-score-row span {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px;
+    color: #2a8c40;
+  }
+  #fruit-score-row .val {
+    color: #4dff6e;
+  }
+  #fruit-canvas {
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
 </style>
 </head>
 <body>
@@ -350,6 +375,7 @@
           <button class="menu-btn" onclick="startSnake()">🐍 SNAKE</button>
           <button class="menu-btn" onclick="startReaction()">⚡ REFLEX</button>
           <button class="menu-btn" onclick="startNumbers()">🔢 MATHS</button>
+          <button class="menu-btn" onclick="startFruit()">🍓 FRUIT</button>
         </div>
       </div>
 
@@ -398,6 +424,16 @@
         <button class="back-btn" id="back-numbers">hold: MENU</button>
       </div>
 
+      <!-- FRUIT CASCADE -->
+      <div class="view" id="fruit-view">
+        <div id="fruit-score-row">
+          <span>SCORE <span class="val" id="fscore">0</span></span>
+          <span>BEST <span class="val" id="fbest">0</span></span>
+        </div>
+        <canvas id="fruit-canvas" width="180" height="180"></canvas>
+        <button class="back-btn" id="back-fruit">hold: MENU</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -412,6 +448,7 @@ function show(id) {
 function goMenu() {
   snakeStop();
   reactionStop();
+  fruitStop();
   show('menu');
 }
 
@@ -658,11 +695,211 @@ function numAnswer(idx) {
   setTimeout(numNext, 900);
 }
 
+// ══════════════════════════════════════════════════
+//  FRUIT CASCADE
+// ══════════════════════════════════════════════════
+const FGRID = 5;
+const FCELL = 36;
+const FTYPES = ['🍎','🍊','🍋','🍇','🍓'];
+const FC = document.getElementById('fruit-canvas');
+const FCTX = FC.getContext('2d');
+let fBoard = [], fScore = 0, fBest = 0, fSelected = null, fBusy = false;
+
+function startFruit() {
+  show('fruit-view');
+  fBest = parseInt(localStorage.getItem('watchGames_fruitBest') || '0', 10);
+  fScore = 0;
+  fSelected = null;
+  fBusy = false;
+  document.getElementById('fscore').textContent = fScore;
+  document.getElementById('fbest').textContent = fBest;
+  generateFruitBoard();
+  fruitDraw();
+}
+
+function fruitStop() {
+  fSelected = null;
+}
+
+function fruitActive() {
+  return document.getElementById('fruit-view').classList.contains('active');
+}
+
+function generateFruitBoard() {
+  do {
+    fBoard = [];
+    for (let y = 0; y < FGRID; y++) {
+      const row = [];
+      for (let x = 0; x < FGRID; x++) row.push(Math.floor(Math.random() * FTYPES.length));
+      fBoard.push(row);
+    }
+  } while (findFruitMatches().length || !fruitHasMove());
+}
+
+function findFruitMatches() {
+  const matched = new Set();
+  for (let y = 0; y < FGRID; y++) {
+    let run = 1;
+    for (let x = 1; x <= FGRID; x++) {
+      if (x < FGRID && fBoard[y][x] === fBoard[y][x - 1]) {
+        run++;
+      } else {
+        if (run >= 3) for (let k = 0; k < run; k++) matched.add((x - 1 - k) + ',' + y);
+        run = 1;
+      }
+    }
+  }
+  for (let x = 0; x < FGRID; x++) {
+    let run = 1;
+    for (let y = 1; y <= FGRID; y++) {
+      if (y < FGRID && fBoard[y][x] === fBoard[y - 1][x]) {
+        run++;
+      } else {
+        if (run >= 3) for (let k = 0; k < run; k++) matched.add(x + ',' + (y - 1 - k));
+        run = 1;
+      }
+    }
+  }
+  return Array.from(matched).map(s => { const p = s.split(','); return { x: +p[0], y: +p[1] }; });
+}
+
+function fruitSwapCells(x1, y1, x2, y2) {
+  const t = fBoard[y1][x1];
+  fBoard[y1][x1] = fBoard[y2][x2];
+  fBoard[y2][x2] = t;
+}
+
+function fruitHasMove() {
+  for (let y = 0; y < FGRID; y++) {
+    for (let x = 0; x < FGRID; x++) {
+      if (x < FGRID - 1) {
+        fruitSwapCells(x, y, x + 1, y);
+        const m = findFruitMatches().length > 0;
+        fruitSwapCells(x, y, x + 1, y);
+        if (m) return true;
+      }
+      if (y < FGRID - 1) {
+        fruitSwapCells(x, y, x, y + 1);
+        const m = findFruitMatches().length > 0;
+        fruitSwapCells(x, y, x, y + 1);
+        if (m) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function fruitDraw() {
+  FCTX.clearRect(0, 0, FGRID * FCELL, FGRID * FCELL);
+  for (let y = 0; y < FGRID; y++) {
+    for (let x = 0; x < FGRID; x++) {
+      if (fBoard[y][x] < 0) continue;
+      const cx = x * FCELL + FCELL / 2;
+      const cy = y * FCELL + FCELL / 2;
+      if (fSelected && fSelected.x === x && fSelected.y === y) {
+        FCTX.strokeStyle = '#4dff6e';
+        FCTX.lineWidth = 2;
+        FCTX.strokeRect(x * FCELL + 2, y * FCELL + 2, FCELL - 4, FCELL - 4);
+      }
+      FCTX.font = Math.floor(FCELL * 0.6) + 'px serif';
+      FCTX.textAlign = 'center';
+      FCTX.textBaseline = 'middle';
+      FCTX.fillText(FTYPES[fBoard[y][x]], cx, cy);
+    }
+  }
+}
+
+function fruitTapXY(clientX, clientY) {
+  if (!fruitActive()) return;
+  const rect = FC.getBoundingClientRect();
+  const x = Math.floor((clientX - rect.left) / (rect.width / FGRID));
+  const y = Math.floor((clientY - rect.top) / (rect.height / FGRID));
+  if (x < 0 || x >= FGRID || y < 0 || y >= FGRID) return;
+  fruitTap(x, y);
+}
+
+function fruitTap(x, y) {
+  if (fBusy) return;
+  if (!fSelected) {
+    fSelected = { x, y };
+    fruitDraw();
+    return;
+  }
+  if (fSelected.x === x && fSelected.y === y) {
+    fSelected = null;
+    fruitDraw();
+    return;
+  }
+  const adjacent = (Math.abs(fSelected.x - x) + Math.abs(fSelected.y - y)) === 1;
+  if (!adjacent) {
+    fSelected = { x, y };
+    fruitDraw();
+    return;
+  }
+  const a = fSelected, b = { x, y };
+  fSelected = null;
+  fruitSwapCells(a.x, a.y, b.x, b.y);
+  if (findFruitMatches().length === 0) {
+    fruitSwapCells(a.x, a.y, b.x, b.y);
+    fruitDraw();
+    return;
+  }
+  fBusy = true;
+  fruitDraw();
+  setTimeout(fruitResolve, 120);
+}
+
+function fruitResolve() {
+  if (!fruitActive()) { fBusy = false; return; }
+  const matches = findFruitMatches();
+  if (matches.length === 0) {
+    fBusy = false;
+    if (!fruitHasMove()) generateFruitBoard();
+    fruitDraw();
+    return;
+  }
+  fScore += matches.length * 10;
+  document.getElementById('fscore').textContent = fScore;
+  if (fScore > fBest) {
+    fBest = fScore;
+    document.getElementById('fbest').textContent = fBest;
+    localStorage.setItem('watchGames_fruitBest', fBest);
+  }
+  matches.forEach(m => { fBoard[m.y][m.x] = -1; });
+  fruitCollapse();
+  fruitDraw();
+  setTimeout(fruitResolve, 180);
+}
+
+function fruitCollapse() {
+  for (let x = 0; x < FGRID; x++) {
+    let write = FGRID - 1;
+    for (let y = FGRID - 1; y >= 0; y--) {
+      if (fBoard[y][x] !== -1) {
+        fBoard[write][x] = fBoard[y][x];
+        write--;
+      }
+    }
+    for (let y = write; y >= 0; y--) {
+      fBoard[y][x] = Math.floor(Math.random() * FTYPES.length);
+    }
+  }
+}
+
+FC.addEventListener('touchend', e => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  fruitTapXY(t.clientX, t.clientY);
+}, { passive: false });
+FC.addEventListener('click', e => {
+  fruitTapXY(e.clientX, e.clientY);
+});
+
 // ── INIT ──────────────────────────────────────────
 snakeDraw();
 
 // Long-press back buttons (600ms hold to go to menu)
-['back-snake','back-reaction','back-numbers'].forEach(id => {
+['back-snake','back-reaction','back-numbers','back-fruit'].forEach(id => {
   const btn = document.getElementById(id);
   let raf;
   const DURATION = 600;
