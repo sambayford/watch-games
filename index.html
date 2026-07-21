@@ -9,6 +9,10 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
 
+  html, body {
+    overflow: hidden;
+  }
+
   body {
     background: #1a1a1a;
     display: flex;
@@ -23,6 +27,7 @@
     position: relative;
     width: 320px;
     height: 320px;
+    transform-origin: center center;
   }
 
   .bezel {
@@ -451,6 +456,17 @@ function goMenu() {
   fruitStop();
   show('menu');
 }
+
+// Scale the fixed 320x320 watch face to fill whatever screen it's on
+// (phone browser, small watch browser, etc.) without touching any of the
+// internal 320px-based layout/canvas math used throughout the games.
+function fitWatch() {
+  const scale = Math.min(window.innerWidth, window.innerHeight) / 320;
+  document.querySelector('.watch').style.transform = `scale(${scale})`;
+}
+fitWatch();
+window.addEventListener('resize', fitWatch);
+window.addEventListener('orientationchange', fitWatch);
 
 // ══════════════════════════════════════════════════
 //  SNAKE
