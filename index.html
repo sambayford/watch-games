@@ -344,8 +344,8 @@
   #fruit-view {
     background: #0d1a0f;
     flex-direction: column;
-    gap: 12px;
-    padding: 24px 20px;
+    gap: 10px;
+    padding: 16px 16px 48px;
   }
   #fruit-score-row {
     display: flex;
@@ -435,7 +435,7 @@
           <span>SCORE <span class="val" id="fscore">0</span></span>
           <span>BEST <span class="val" id="fbest">0</span></span>
         </div>
-        <canvas id="fruit-canvas" width="180" height="180"></canvas>
+        <canvas id="fruit-canvas" width="200" height="200"></canvas>
         <button class="back-btn" id="back-fruit">hold: MENU</button>
       </div>
 
@@ -715,7 +715,7 @@ function numAnswer(idx) {
 //  FRUIT CASCADE
 // ══════════════════════════════════════════════════
 const FGRID = 5;
-const FCELL = 36;
+const FCELL = 40;
 const FTYPES = ['🍋‍🟩','🍊','🍋','🍇','🍓'];
 const FC = document.getElementById('fruit-canvas');
 const FCTX = FC.getContext('2d');
