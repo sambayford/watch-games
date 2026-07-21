@@ -402,6 +402,41 @@
     gap: 10px;
   }
 
+  /* ===================== BLOCKADE ===================== */
+  #blockade-view {
+    background: #0d1a0f;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 16px 48px;
+    position: relative;
+  }
+  #bl-score-row {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+  }
+  #bl-score-row span {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    color: #2a8c40;
+  }
+  #bl-score-row .val {
+    color: #4dff6e;
+  }
+  #bl-canvas {
+    border-radius: 4px;
+  }
+  #bl-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 15;
+    gap: 10px;
+  }
+
 </style>
 </head>
 <body>
@@ -419,6 +454,7 @@
           <button class="menu-btn" onclick="startNumbers()">🔢 MATHS</button>
           <button class="menu-btn" onclick="startFruit()">🍓 FRUIT</button>
           <button class="menu-btn" onclick="startBattleBoats()">🚢 BOATS</button>
+          <button class="menu-btn" onclick="startBlockade()">🧱 BLOCKADE</button>
         </div>
       </div>
 
@@ -492,6 +528,21 @@
         <button class="back-btn" id="back-bb">hold: MENU</button>
       </div>
 
+      <!-- BLOCKADE -->
+      <div class="view" id="blockade-view">
+        <div id="bl-score-row">
+          <span>SCORE <span class="val" id="blscore">0</span></span>
+          <span>LINES <span class="val" id="bllines">0</span></span>
+        </div>
+        <canvas id="bl-canvas" width="108" height="216"></canvas>
+        <div id="bl-overlay">
+          <div class="overlay-title">BLOCKADE</div>
+          <div class="overlay-sub">swipe: move / drop<br>tap: rotate</div>
+          <button class="overlay-btn" onclick="blStart()">START</button>
+        </div>
+        <button class="back-btn" id="back-blockade">hold: MENU</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -508,6 +559,7 @@ function goMenu() {
   reactionStop();
   fruitStop();
   bbStop();
+  blockadeStop();
   show('menu');
 }
 
@@ -1105,11 +1157,253 @@ BC.addEventListener('click', e => {
   bbTapXY(e.clientX, e.clientY);
 });
 
+// ══════════════════════════════════════════════════
+//  BLOCKADE (simplified Tetris)
+// ══════════════════════════════════════════════════
+const BLCOLS = 6, BLROWS = 12, BLCELL = 18;
+const BLPIECES = {
+  I: { shape: [[1, 1, 1, 1]], color: '#4dd2ff' },
+  O: { shape: [[1, 1], [1, 1]], color: '#ffe14d' },
+  T: { shape: [[0, 1, 0], [1, 1, 1]], color: '#c04dff' },
+  S: { shape: [[0, 1, 1], [1, 1, 0]], color: '#4dff6e' },
+  Z: { shape: [[1, 1, 0], [0, 1, 1]], color: '#ff4d4d' },
+  J: { shape: [[1, 0, 0], [1, 1, 1]], color: '#4d6bff' },
+  L: { shape: [[0, 0, 1], [1, 1, 1]], color: '#ff9d4d' }
+};
+const BLKEYS = Object.keys(BLPIECES);
+const BLC = document.getElementById('bl-canvas');
+const BLCTX = BLC.getContext('2d');
+let blBoard = [], blPiece = null, blScore = 0, blLines = 0, blLevel = 1;
+let blBest = 0, blRunning = false, blTick = null, blDropMs = 650;
+let blTouchSX = 0, blTouchSY = 0;
+
+function startBlockade() {
+  show('blockade-view');
+  blBest = parseInt(localStorage.getItem('watchGames_blockadeBest') || '0', 10);
+  document.getElementById('bl-overlay').innerHTML =
+    `<div class="overlay-title">BLOCKADE</div><div class="overlay-sub">swipe: move / drop<br>tap: rotate</div><button class="overlay-btn" onclick="blStart()">START</button>`;
+  document.getElementById('bl-overlay').style.display = 'flex';
+  BLCTX.clearRect(0, 0, BLCOLS * BLCELL, BLROWS * BLCELL);
+}
+
+function blockadeStop() {
+  blRunning = false;
+  clearInterval(blTick);
+}
+
+function blActive() {
+  return document.getElementById('blockade-view').classList.contains('active');
+}
+
+function blRotateMatrix(m) {
+  const rows = m.length, cols = m[0].length;
+  const res = Array.from({ length: cols }, () => Array(rows).fill(0));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) res[c][rows - 1 - r] = m[r][c];
+  }
+  return res;
+}
+
+function blCollide(matrix, px, py) {
+  for (let r = 0; r < matrix.length; r++) {
+    for (let c = 0; c < matrix[r].length; c++) {
+      if (!matrix[r][c]) continue;
+      const bx = px + c, by = py + r;
+      if (bx < 0 || bx >= BLCOLS || by >= BLROWS) return true;
+      if (by >= 0 && blBoard[by][bx]) return true;
+    }
+  }
+  return false;
+}
+
+function blSpawnPiece() {
+  const key = BLKEYS[Math.floor(Math.random() * BLKEYS.length)];
+  const def = BLPIECES[key];
+  const matrix = def.shape.map(row => row.slice());
+  const x = Math.floor((BLCOLS - matrix[0].length) / 2);
+  blPiece = { matrix, x, y: 0, color: def.color };
+  if (blCollide(matrix, x, 0)) {
+    blEndGame();
+  }
+}
+
+function blMerge() {
+  const { matrix, x, y, color } = blPiece;
+  for (let r = 0; r < matrix.length; r++) {
+    for (let c = 0; c < matrix[r].length; c++) {
+      if (matrix[r][c] && y + r >= 0) blBoard[y + r][x + c] = color;
+    }
+  }
+}
+
+function blClearLines() {
+  let cleared = 0;
+  for (let r = BLROWS - 1; r >= 0; r--) {
+    if (blBoard[r].every(cell => cell !== 0)) {
+      blBoard.splice(r, 1);
+      blBoard.unshift(Array(BLCOLS).fill(0));
+      cleared++;
+      r++;
+    }
+  }
+  return cleared;
+}
+
+function blLockPiece() {
+  blMerge();
+  const cleared = blClearLines();
+  if (cleared > 0) {
+    const scoreTable = { 1: 100, 2: 300, 3: 500, 4: 800 };
+    blScore += (scoreTable[cleared] || 0) * blLevel;
+    blLines += cleared;
+    const newLevel = Math.floor(blLines / 10) + 1;
+    if (newLevel !== blLevel) {
+      blLevel = newLevel;
+      blDropMs = Math.max(150, 650 - (blLevel - 1) * 60);
+      if (blRunning) {
+        clearInterval(blTick);
+        blTick = setInterval(blStep, blDropMs);
+      }
+    }
+    document.getElementById('blscore').textContent = blScore;
+    document.getElementById('bllines').textContent = blLines;
+    if (blScore > blBest) {
+      blBest = blScore;
+      localStorage.setItem('watchGames_blockadeBest', blBest);
+    }
+  }
+  blSpawnPiece();
+}
+
+function blStep() {
+  if (!blRunning) return;
+  if (!blCollide(blPiece.matrix, blPiece.x, blPiece.y + 1)) {
+    blPiece.y++;
+  } else {
+    blLockPiece();
+  }
+  blDraw();
+}
+
+function blMove(dx) {
+  if (!blRunning || !blPiece) return;
+  if (!blCollide(blPiece.matrix, blPiece.x + dx, blPiece.y)) {
+    blPiece.x += dx;
+    blDraw();
+  }
+}
+
+function blRotate() {
+  if (!blRunning || !blPiece) return;
+  const rotated = blRotateMatrix(blPiece.matrix);
+  if (!blCollide(rotated, blPiece.x, blPiece.y)) {
+    blPiece.matrix = rotated;
+  } else if (!blCollide(rotated, blPiece.x - 1, blPiece.y)) {
+    blPiece.matrix = rotated;
+    blPiece.x -= 1;
+  } else if (!blCollide(rotated, blPiece.x + 1, blPiece.y)) {
+    blPiece.matrix = rotated;
+    blPiece.x += 1;
+  }
+  blDraw();
+}
+
+function blHardDrop() {
+  if (!blRunning || !blPiece) return;
+  while (!blCollide(blPiece.matrix, blPiece.x, blPiece.y + 1)) blPiece.y++;
+  blLockPiece();
+  blDraw();
+}
+
+function blEndGame() {
+  blRunning = false;
+  clearInterval(blTick);
+  document.getElementById('bl-overlay').innerHTML =
+    `<div class="overlay-title">GAME<br>OVER</div><div class="overlay-sub">score: ${blScore}<br>best: ${blBest}</div><button class="overlay-btn" onclick="blStart()">RETRY</button>`;
+  document.getElementById('bl-overlay').style.display = 'flex';
+}
+
+function blStart() {
+  blBoard = Array.from({ length: BLROWS }, () => Array(BLCOLS).fill(0));
+  blScore = 0;
+  blLines = 0;
+  blLevel = 1;
+  blDropMs = 650;
+  blRunning = true;
+  document.getElementById('blscore').textContent = 0;
+  document.getElementById('bllines').textContent = 0;
+  document.getElementById('bl-overlay').style.display = 'none';
+  blSpawnPiece();
+  blDraw();
+  clearInterval(blTick);
+  blTick = setInterval(blStep, blDropMs);
+}
+
+function blDraw() {
+  BLCTX.clearRect(0, 0, BLCOLS * BLCELL, BLROWS * BLCELL);
+  BLCTX.strokeStyle = '#1a3d1e';
+  BLCTX.lineWidth = 1;
+  for (let r = 0; r < BLROWS; r++) {
+    for (let c = 0; c < BLCOLS; c++) {
+      BLCTX.strokeRect(c * BLCELL + 0.5, r * BLCELL + 0.5, BLCELL - 1, BLCELL - 1);
+      if (blBoard[r][c]) {
+        BLCTX.fillStyle = blBoard[r][c];
+        BLCTX.fillRect(c * BLCELL + 1, r * BLCELL + 1, BLCELL - 2, BLCELL - 2);
+      }
+    }
+  }
+  if (blPiece) {
+    const { matrix, x, y, color } = blPiece;
+    BLCTX.fillStyle = color;
+    BLCTX.shadowColor = color;
+    BLCTX.shadowBlur = 6;
+    for (let r = 0; r < matrix.length; r++) {
+      for (let c = 0; c < matrix[r].length; c++) {
+        if (matrix[r][c] && y + r >= 0) {
+          BLCTX.fillRect((x + c) * BLCELL + 1, (y + r) * BLCELL + 1, BLCELL - 2, BLCELL - 2);
+        }
+      }
+    }
+    BLCTX.shadowBlur = 0;
+  }
+}
+
+function blHandleGesture(dx, dy) {
+  if (!blActive() || !blRunning) return;
+  if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+    blRotate();
+  } else if (Math.abs(dx) > Math.abs(dy)) {
+    blMove(dx > 0 ? 1 : -1);
+  } else if (dy > 12) {
+    blHardDrop();
+  }
+}
+
+document.getElementById('blockade-view').addEventListener('touchstart', e => {
+  blTouchSX = e.touches[0].clientX;
+  blTouchSY = e.touches[0].clientY;
+}, { passive: true });
+document.getElementById('blockade-view').addEventListener('touchend', e => {
+  e.preventDefault();
+  const dx = e.changedTouches[0].clientX - blTouchSX;
+  const dy = e.changedTouches[0].clientY - blTouchSY;
+  blHandleGesture(dx, dy);
+}, { passive: false });
+document.getElementById('blockade-view').addEventListener('mousedown', e => {
+  blTouchSX = e.clientX;
+  blTouchSY = e.clientY;
+});
+document.getElementById('blockade-view').addEventListener('mouseup', e => {
+  const dx = e.clientX - blTouchSX;
+  const dy = e.clientY - blTouchSY;
+  blHandleGesture(dx, dy);
+});
+
 // ── INIT ──────────────────────────────────────────
 snakeDraw();
 
 // Long-press back buttons (600ms hold to go to menu)
-['back-snake','back-reaction','back-numbers','back-fruit','back-bb'].forEach(id => {
+['back-snake','back-reaction','back-numbers','back-fruit','back-bb','back-blockade'].forEach(id => {
   const btn = document.getElementById(id);
   let raf;
   const DURATION = 600;
